@@ -62,7 +62,10 @@ const createOrder = async (req, res, next) => {
     estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
 
     const order = await Order.create({
-      customer,
+      customer: {
+        ...customer,
+        userId: req.user?._id || null,
+      },
       shippingAddress,
       products: items,
       subtotal,
@@ -91,7 +94,6 @@ const createOrder = async (req, res, next) => {
     }
 
     // ── 5. Side effects — fire and forget ───────────────────────────────────
-    // الـ order اتسجل بنجاح — WhatsApp والـ notification مش بيأثروا على الـ response
     sendWhatsAppConfirmation(order).catch((err) =>
       console.error("WhatsApp failed:", err.message)
     );

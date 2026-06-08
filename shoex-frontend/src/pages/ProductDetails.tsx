@@ -66,6 +66,7 @@ export default function ProductDetails() {
   const [reviewsLoading,   setReviewsLoading]   = useState(true);
   const [newRating,        setNewRating]        = useState(5);
   const [newComment,       setNewComment]       = useState("");
+  const [commentError,     setCommentError]     = useState<string>("");   // ← NEW: inline error for comment
   const [submitLoading,    setSubmitLoading]    = useState(false);
 
   const addItem    = useCartStore((s) => s.addItem);
@@ -149,7 +150,25 @@ export default function ProductDetails() {
         toast.success("Added to wishlist.");
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.error || "Failed to toggle wishlist.");
+      const status    = err.response?.status;
+      const serverMsg = err.response?.data?.error;
+
+      if (serverMsg) {
+        toast.error(serverMsg);
+      } else if (status === 401) {
+        toast.error("Please login to manage your wishlist.");
+      } else {
+        toast.error("Failed to update wishlist. Please try again.");
+      }
+    }
+  };
+
+  // ── Comment change handler — clears inline error live ──────────────────────
+  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewComment(value);
+    if (commentError && value.trim().length >= 10) {
+      setCommentError("");
     }
   };
 
@@ -164,12 +183,19 @@ export default function ProductDetails() {
 
     if (!product) return;
 
+    // ── Inline validation ──────────────────────────────────────────────────────
+    if (newComment.trim().length === 0) {
+      setCommentError("Please write a comment before submitting.");
+      return;
+    }
     if (newComment.trim().length < 10) {
-      toast.error("Review comment must be at least 10 characters.");
+      setCommentError(`Comment is too short (${newComment.trim().length}/10 characters minimum).`);
       return;
     }
 
+    setCommentError("");
     setSubmitLoading(true);
+
     try {
       await productsService.submitProductReview(product.id, {
         rating: newRating,
@@ -182,8 +208,19 @@ export default function ProductDetails() {
       loadReviews();
       loadProductData();
     } catch (err: any) {
-      const msg = err.response?.data?.error || "You can only review items you have bought and had delivered.";
-      toast.error(msg);
+      const status    = err.response?.status;
+      const serverMsg = err.response?.data?.error;
+
+      if (serverMsg) {
+        // Server returned a specific error message — show it inline under the comment field
+        setCommentError(serverMsg);
+      } else if (status === 403) {
+        setCommentError("You must purchase this product before leaving a review.");
+      } else if (status === 401) {
+        toast.error("Please login to submit a review.");
+      } else {
+        toast.error("Failed to submit review. Please try again.");
+      }
     } finally {
       setSubmitLoading(false);
     }
@@ -583,12 +620,32 @@ export default function ProductDetails() {
                 <label className="text-xs text-gray-400 font-medium block mb-2">Comment</label>
                 <textarea
                   value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
+                  onChange={handleCommentChange}
                   rows={4}
-                  required
                   placeholder="Tell us about the fit, comfort, quality (min 10 characters)..."
-                  className="w-full bg-[#0d0d0d] border border-white/8 focus:border-[#e63946]/50 hover:border-white/12 rounded-xl px-4 py-3 text-white text-sm outline-none transition-all placeholder:text-gray-600 resize-none"
+                  className={`w-full bg-[#0d0d0d] border rounded-xl px-4 py-3 text-white text-sm outline-none transition-all placeholder:text-gray-600 resize-none ${
+                    commentError
+                      ? "border-red-500/60 focus:border-red-500"
+                      : "border-white/8 focus:border-[#e63946]/50 hover:border-white/12"
+                  }`}
                 />
+                {/* ── Inline error message ── */}
+                {commentError && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-2 text-xs text-red-400 font-semibold flex items-center gap-1.5"
+                  >
+                    <AlertTriangle size={12} className="flex-shrink-0" />
+                    {commentError}
+                  </motion.p>
+                )}
+                {/* ── Live character counter ── */}
+                {newComment.length > 0 && newComment.trim().length < 10 && !commentError && (
+                  <p className="mt-1.5 text-xs text-[#555]">
+                    {newComment.trim().length}/10 characters minimum
+                  </p>
+                )}
               </div>
 
               <button

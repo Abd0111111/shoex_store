@@ -128,20 +128,16 @@ const createProductReview = async (req, res, next) => {
     }
 
     // Check user has a delivered order with this product
-    const hasDeliveredOrder = await Order.findOne({
-      "customer.userId": userId,
-      orderStatus: "Delivered",
-      "products.productId": product._id,
-    });
+const hasAnyOrder = await Order.findOne({ "customer.userId": userId });
 
-    if (!hasDeliveredOrder) {
-      return sendError(
-        res,
-        "You must purchase this product before reviewing.",
-        "REVIEW_NOT_ALLOWED",
-        403
-      );
-    }
+if (!hasAnyOrder) {
+  return sendError(
+    res,
+    "You must place at least one order before reviewing.",
+    "REVIEW_NOT_ALLOWED",
+    403
+  );
+}
 
     // Check duplicate review
     const existingReview = await Review.findOne({ productId, userId });
