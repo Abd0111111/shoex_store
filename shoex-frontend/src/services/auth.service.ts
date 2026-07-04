@@ -28,11 +28,6 @@ export const authService = {
     return data.data;
   },
 
-  googleAuth: async (idToken: string): Promise<AuthResponse> => {
-    const { data } = await api.post("/auth/google", { idToken });
-    return data.data;
-  },
-
   logout: async (): Promise<void> => {
     await api.post("/auth/logout").catch(() => {}); // fire and forget
   },

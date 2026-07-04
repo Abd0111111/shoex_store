@@ -1,12 +1,9 @@
 const crypto = require("crypto");
-const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User.model");
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require("../services/auth.service");
 const { sendPasswordResetEmail } = require("../services/email.service");
 const { notifyNewCustomer } = require("../services/notification.service");
 const { sendSuccess, sendError } = require("../utils/response");
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // POST /api/v1/auth/login
 const login = async (req, res, next) => {
@@ -88,84 +85,6 @@ const register = async (req, res, next) => {
   }
 };
 
-// POST /api/v1/auth/google
-const googleAuth = async (req, res, next) => {
-  try {
-    const { idToken } = req.body;
-
-    if (!idToken) {
-      return sendError(res, "Google ID token is required", "VALIDATION_ERROR", 422);
-    }
-
-    // Verify Google token
-    let payload;
-    try {
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
-      payload = ticket.getPayload();
-    } catch {
-      return sendError(res, "Invalid Google token", "UNAUTHORIZED", 401);
-    }
-
-    const { email, name, picture, sub: googleId } = payload;
-
-    // Find or create user
-    let user = await User.findOne({ email });
-    let isNewUser = false;
-
-    if (!user) {
-      // New user via Google
-      user = await User.create({
-        name,
-        email,
-        password: crypto.randomBytes(32).toString("hex"), // random password — can't login with it
-        avatar: picture || null,
-        role: "user",
-        status: "Active",
-      });
-      isNewUser = true;
-      await notifyNewCustomer(user);
-    } else {
-      // Existing user — update avatar if not set
-      if (!user.avatar && picture) {
-        user.avatar = picture;
-      }
-
-      if (user.status === "Inactive") {
-        return sendError(res, "Account is inactive", "FORBIDDEN", 403);
-      }
-    }
-
-    const token = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
-
-    user.refreshToken = refreshToken;
-    await user.save();
-
-    return sendSuccess(
-      res,
-      {
-        token,
-        refreshToken,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          isOwner: user.isOwner,
-          phone: user.phone,
-          avatar: user.avatar,
-        },
-      },
-      isNewUser ? "Registration successful" : "Login successful",
-      isNewUser ? 201 : 200
-    );
-  } catch (error) {
-    next(error);
-  }
-};
 
 // POST /api/v1/auth/logout
 const logout = async (req, res, next) => {
@@ -286,7 +205,6 @@ const resetPassword = async (req, res, next) => {
 module.exports = {
   login,
   register,
-  googleAuth,
   logout,
   getMe,
   refresh,

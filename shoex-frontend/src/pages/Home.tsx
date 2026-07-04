@@ -112,17 +112,17 @@ export default function Home() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex items-center justify-center gap-4 mb-10 w-full sm:w-auto"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10 w-full sm:w-auto px-4 sm:px-0"
           >
             <Link
               to="/shop"
-              className="px-6 py-3.5 bg-[#e63946] hover:bg-[#c1121f] text-white rounded-xl font-bold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 flex items-center gap-2"
+              className="px-6 py-3.5 bg-[#e63946] hover:bg-[#c1121f] text-white rounded-xl font-bold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto text-center"
             >
               Explore Collection <ArrowRight size={16} />
             </Link>
             <Link
               to="/shop"
-              className="px-6 py-3.5 bg-[#161619] border border-[#2a2a2a] hover:bg-[#202024] text-white rounded-xl font-bold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95"
+              className="px-6 py-3.5 bg-[#161619] border border-[#2a2a2a] hover:bg-[#202024] text-white rounded-xl font-bold tracking-wide transition-all duration-300 hover:scale-105 active:scale-95 w-full sm:w-auto text-center"
             >
               New Arrivals
             </Link>
@@ -134,7 +134,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
-            className="w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl relative border border-white/5 aspect-[21/9] bg-[#0c0c0e]"
+            className="w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl relative border border-white/5 aspect-[16/10] sm:aspect-[21/9] bg-[#0c0c0e]"
           >
             <img
               src={activeHero.image}

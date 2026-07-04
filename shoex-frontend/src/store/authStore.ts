@@ -10,7 +10,6 @@ interface AuthStore {
   refreshToken: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  googleLogin: (idToken: string) => Promise<boolean>;
   logout: () => void;
   setToken: (token: string, refreshToken: string) => void;
   setUser: (user: User) => void;
@@ -28,13 +27,6 @@ export const useAuthStore = create<AuthStore>()(
       login: async (email, password) => {
         const { user, token, refreshToken } = await authService.login(email, password);
         // Synchronously set header to prevent microtask race condition prior to navigation
-        axiosClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-        set({ user, token, refreshToken, isAuthenticated: true });
-        return true;
-      },
-
-      googleLogin: async (idToken) => {
-        const { user, token, refreshToken } = await authService.googleAuth(idToken);
         axiosClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
         set({ user, token, refreshToken, isAuthenticated: true });
         return true;
