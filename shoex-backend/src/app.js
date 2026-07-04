@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const morgan = require("morgan");
 const errorHandler = require("./middlewares/error.middleware");
 
 // =====================
@@ -44,6 +43,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Logger
 // =====================
 if (process.env.NODE_ENV === "development") {
+  const morgan = require("morgan");
   app.use(morgan("dev"));
 }
 
