@@ -100,7 +100,6 @@ orderSchema.pre("save", async function (next) {
 });
 
 // Indexes
-orderSchema.index({ orderId: 1 }, { unique: true });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ "customer.email": 1 });

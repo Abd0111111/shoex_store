@@ -45,7 +45,4 @@ const promoCodeSchema = new mongoose.Schema(
   }
 );
 
-// Index
-promoCodeSchema.index({ code: 1 }, { unique: true });
-
 module.exports = mongoose.model("PromoCode", promoCodeSchema);

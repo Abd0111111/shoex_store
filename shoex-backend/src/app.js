@@ -48,6 +48,17 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // =====================
+// Root Route
+// =====================
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Welcome to SHOEX API 👟",
+    docs: "/api/v1/health",
+  });
+});
+
+// =====================
 // Health Check
 // =====================
 app.get("/api/v1/health", (req, res) => {
