@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Settings = require("../../models/Settings.model");
 const User = require("../../models/User.model");
 const bcrypt = require("bcryptjs");
@@ -69,6 +70,10 @@ const updatePaymentSettings = async (req, res, next) => {
   }
 };
 
+// Helper: is this a real, existing Mongo ObjectId (not a frontend-generated UUID)?
+const isPersistedObjectId = (id) =>
+  mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+
 // PUT /api/v1/admin/settings/shipping
 const updateShippingSettings = async (req, res, next) => {
   try {
@@ -82,24 +87,54 @@ const updateShippingSettings = async (req, res, next) => {
 
     await settings.save();
 
-    // Update shipping zones
+    // Create / update shipping zones
     if (locations && Array.isArray(locations)) {
-      for (const loc of locations) {
-        const zone = await ShippingZone.findById(loc.id);
-        if (!zone) continue;
+      // Track every zone ID that should still exist after this request
+      // (built AFTER creation, not from the raw incoming payload, so a
+      // just-created zone doesn't get wiped out by the cleanup step below)
+      const currentZoneIds = [];
 
-        // isCustom: false — only rate and deliveryDays editable
-        if (!zone.isCustom) {
-          zone.rate = loc.rate ?? zone.rate;
-          zone.deliveryDays = loc.deliveryDays ?? zone.deliveryDays;
-        } else {
-          // isCustom: true — fully editable
-          zone.city = loc.city ?? zone.city;
-          zone.rate = loc.rate ?? zone.rate;
-          zone.deliveryDays = loc.deliveryDays ?? zone.deliveryDays;
+      for (const loc of locations) {
+        const existsInDb = isPersistedObjectId(loc.id);
+
+        if (existsInDb) {
+          // Existing zone -> update it
+          const zone = await ShippingZone.findById(loc.id);
+          if (!zone) continue;
+
+          if (!zone.isCustom) {
+            // Default zones: only rate and deliveryDays editable
+            zone.rate = loc.rate ?? zone.rate;
+            zone.deliveryDays = loc.deliveryDays ?? zone.deliveryDays;
+          } else {
+            // Custom zones: fully editable
+            zone.city = loc.city ?? zone.city;
+            zone.rate = loc.rate ?? zone.rate;
+            zone.deliveryDays = loc.deliveryDays ?? zone.deliveryDays;
+          }
+          await zone.save();
+          currentZoneIds.push(String(zone._id));
+        } else if (loc.isCustom) {
+          // New custom zone from the frontend (client-generated id, e.g. crypto.randomUUID())
+          // -> this is the ONLY place a custom zone actually gets written to the database
+          const newZone = await ShippingZone.create({
+            city: loc.city,
+            rate: loc.rate,
+            deliveryDays: loc.deliveryDays,
+            isCustom: true,
+          });
+          currentZoneIds.push(String(newZone._id));
         }
-        await zone.save();
+        // else: invalid id and not flagged as custom -> ignore silently
       }
+
+      // Remove custom zones that were deleted on the frontend
+      // (i.e. exist in DB as isCustom but weren't in this request at all —
+      // uses currentZoneIds so zones created moments ago are never caught by this)
+      await ShippingZone.deleteMany({
+        isCustom: true,
+        _id: { $nin: currentZoneIds },
+      });
     }
 
     return sendSuccess(res, null, "Shipping settings updated");

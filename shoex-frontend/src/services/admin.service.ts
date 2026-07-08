@@ -111,4 +111,25 @@ export const adminService = {
     const { data } = await api.delete(`/admin/team/${id}`);
     return data.data;
   },
+
+  // ─── Promo Codes ─────────────────────────────────────
+  getPromoCodes: async (): Promise<any[]> => {
+    const { data } = await api.get("/admin/promo");
+    return data.data || [];
+  },
+
+  createPromoCode: async (promo: any): Promise<any> => {
+    const { data } = await api.post("/admin/promo", promo);
+    return data.data;
+  },
+
+  updatePromoCode: async (id: string, promo: any): Promise<any> => {
+    const { data } = await api.put(`/admin/promo/${id}`, promo);
+    return data.data;
+  },
+
+  deletePromoCode: async (id: string): Promise<any> => {
+    const { data } = await api.delete(`/admin/promo/${id}`);
+    return data.data;
+  },
 };

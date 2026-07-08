@@ -9,6 +9,8 @@ import {
   AlertCircle,
   ArrowLeft,
   ShoppingBag,
+  Tag,
+  X,
 } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import api from "@/services/api";
@@ -133,7 +135,31 @@ function ProgressBar({ step }: { step: Step }) {
   );
 }
 
-function OrderSummary({ shippingCost }: { shippingCost: number }) {
+interface OrderSummaryProps {
+  shippingCost: number;
+  promoCode: string;
+  setPromoCode: (code: string) => void;
+  appliedPromo: any;
+  promoError: string;
+  setPromoError: (err: string) => void;
+  promoLoading: boolean;
+  onApplyPromo: () => void;
+  onRemovePromo: () => void;
+  discountAmount: number;
+}
+
+function OrderSummary({
+  shippingCost,
+  promoCode,
+  setPromoCode,
+  appliedPromo,
+  promoError,
+  setPromoError,
+  promoLoading,
+  onApplyPromo,
+  onRemovePromo,
+  discountAmount,
+}: OrderSummaryProps) {
   const { items, totalPrice } = useCartStore();
   const subtotal = totalPrice();
 
@@ -167,6 +193,16 @@ function OrderSummary({ shippingCost }: { shippingCost: number }) {
           <span className="text-gray-400">Subtotal</span>
           <span className="text-white font-medium">{formatPrice(subtotal)}</span>
         </div>
+
+        {appliedPromo && (
+          <div className="flex justify-between text-sm">
+            <span className="text-green-400">
+              Discount ({appliedPromo.discountType === "percentage" ? `${appliedPromo.discountValue}%` : "Fixed"})
+            </span>
+            <span className="text-green-400 font-medium">-{formatPrice(discountAmount)}</span>
+          </div>
+        )}
+
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Shipping</span>
           <motion.span key={shippingCost} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
@@ -177,13 +213,80 @@ function OrderSummary({ shippingCost }: { shippingCost: number }) {
         <div className="border-t border-white/5 pt-3 flex justify-between items-center">
           <span className="text-white font-bold text-base">Total</span>
           <div className="text-right">
-            <motion.p key={subtotal} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            <motion.p key={subtotal - discountAmount} initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               className="text-white font-black text-xl">
-              {formatPrice(subtotal + shippingCost)}
+              {formatPrice(subtotal + shippingCost - discountAmount)}
             </motion.p>
             <p className="text-gray-500 text-xs">+ {formatPrice(shippingCost)} shipping</p>
           </div>
         </div>
+      </div>
+
+      {/* Promo Code Input/Box */}
+      <div className="border-t border-white/5 pt-5 mt-5">
+        {appliedPromo ? (
+          <div className="flex items-center justify-between bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Tag size={14} className="text-green-400" />
+              <span className="text-green-400 font-bold">{appliedPromo.code}</span>
+              <span className="text-green-400 text-xs">
+                ({appliedPromo.discountType === "percentage" ? `${appliedPromo.discountValue}%` : formatPrice(appliedPromo.discountValue)} off)
+              </span>
+            </div>
+            <button
+              onClick={onRemovePromo}
+              className="text-green-400 hover:text-white transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Tag size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value.toUpperCase());
+                    setPromoError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onApplyPromo();
+                    }
+                  }}
+                  placeholder="PROMO CODE"
+                  className="w-full bg-[#1a1a1a] border border-white/8 focus:border-[#e63946]/60 hover:border-white/15 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm outline-none transition-all placeholder:text-gray-600"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={onApplyPromo}
+                disabled={promoLoading || !promoCode.trim()}
+                className="bg-[#e63946] hover:bg-[#c1121f] active:scale-[0.98] text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center min-w-[70px]"
+              >
+                {promoLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  "Apply"
+                )}
+              </button>
+            </div>
+            {promoError && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-400 text-xs flex items-center gap-1.5 px-1"
+              >
+                <AlertCircle size={12} />
+                {promoError}
+              </motion.p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -209,6 +312,59 @@ export default function Checkout() {
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
+
+  // Promo Code States
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [promoError, setPromoError] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+
+  const subtotal = totalPrice();
+  let discountAmount = 0;
+  if (appliedPromo) {
+    if (appliedPromo.discountType === "percentage") {
+      discountAmount = (subtotal * appliedPromo.discountValue) / 100;
+    } else if (appliedPromo.discountType === "fixed") {
+      discountAmount = appliedPromo.discountValue;
+    }
+    discountAmount = Math.min(discountAmount, subtotal);
+  }
+
+  const handleApplyPromo = async () => {
+    const code = promoCode.trim().toUpperCase();
+    if (!code) return;
+
+    setPromoLoading(true);
+    setPromoError("");
+    try {
+      const { data } = await api.post("/promo/validate", { code });
+      if (data.success && data.data) {
+        // Min order check
+        if (data.data.minOrderValue && subtotal < data.data.minOrderValue) {
+          setPromoError(`Minimum order value of ${formatPrice(data.data.minOrderValue)} required.`);
+          setAppliedPromo(null);
+        } else {
+          setAppliedPromo(data.data);
+          toast.success("Promo code applied successfully!");
+        }
+      } else {
+        setPromoError("Invalid promo code.");
+        setAppliedPromo(null);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || "Invalid promo code.";
+      setPromoError(msg);
+      setAppliedPromo(null);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoCode("");
+    setPromoError("");
+  };
 
   // Fetch shipping rates
   useEffect(() => {
@@ -307,8 +463,8 @@ export default function Checkout() {
         })),
         subtotal: totalPrice(),
         shippingCost: shippingCost,
-        discount: 0,
-        promoCode: null,
+        discount: discountAmount,
+        promoCode: appliedPromo ? appliedPromo.code : null,
         feedback: feedback ? feedback.trim() : null,
       };
 
@@ -595,7 +751,18 @@ export default function Checkout() {
           {/* ── Right: Summary ── */}
           <div className="lg:col-span-2">
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-              <OrderSummary shippingCost={shippingCost} />
+              <OrderSummary
+                shippingCost={shippingCost}
+                promoCode={promoCode}
+                setPromoCode={setPromoCode}
+                appliedPromo={appliedPromo}
+                promoError={promoError}
+                setPromoError={setPromoError}
+                promoLoading={promoLoading}
+                onApplyPromo={handleApplyPromo}
+                onRemovePromo={handleRemovePromo}
+                discountAmount={discountAmount}
+              />
             </motion.div>
           </div>
 

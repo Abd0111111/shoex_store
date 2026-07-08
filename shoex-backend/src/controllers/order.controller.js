@@ -20,6 +20,59 @@ const createOrder = async (req, res, next) => {
       feedback,
     } = req.body;
 
+    // ── 0. Validate promo code (if provided) ─────────────────────────────────
+    let calculatedDiscount = 0;
+    const cleanPromoCode = promoCode && typeof promoCode === "string" ? promoCode.trim().toUpperCase() : null;
+    
+    if (cleanPromoCode) {
+      const promo = await PromoCode.findOne({
+        code: cleanPromoCode,
+        isActive: true,
+      });
+
+      if (!promo) {
+        return sendError(res, "Promo code not found or expired.", "INVALID_PROMO", 404);
+      }
+
+      // Check expiry
+      if (promo.expiresAt && new Date() > promo.expiresAt) {
+        return sendError(res, "Promo code has expired.", "INVALID_PROMO", 404);
+      }
+
+      // Check max uses
+      if (promo.maxUses && promo.usedCount >= promo.maxUses) {
+        return sendError(res, "Promo code usage limit reached.", "INVALID_PROMO", 404);
+      }
+
+      // Check min order value
+      if (promo.minOrderValue && subtotal < promo.minOrderValue) {
+        return sendError(
+          res,
+          `Minimum order value of ${promo.minOrderValue} EGP not met.`,
+          "INVALID_PROMO",
+          422
+        );
+      }
+
+      // Calculate discount
+      if (promo.discountType === "percentage") {
+        calculatedDiscount = (subtotal * promo.discountValue) / 100;
+      } else if (promo.discountType === "fixed") {
+        calculatedDiscount = promo.discountValue;
+      }
+      calculatedDiscount = Math.min(calculatedDiscount, subtotal);
+
+      // Verify matching discount value to prevent tampering
+      if (Math.abs(calculatedDiscount - (discount || 0)) > 1) {
+        return sendError(
+          res,
+          "Invalid discount amount calculation.",
+          "VALIDATION_ERROR",
+          422
+        );
+      }
+    }
+
     // ── 1. Validate stock + deduct ──────────────────────────────────────────
     for (const item of items) {
       const product = await Product.findById(item.productId);
@@ -56,7 +109,7 @@ const createOrder = async (req, res, next) => {
     }
 
     // ── 2. Create order ─────────────────────────────────────────────────────
-    const total = subtotal + shippingCost - (discount || 0);
+    const total = subtotal + shippingCost - calculatedDiscount;
 
     const estimatedDelivery = new Date();
     estimatedDelivery.setDate(estimatedDelivery.getDate() + 3);
@@ -70,16 +123,16 @@ const createOrder = async (req, res, next) => {
       products: items,
       subtotal,
       shippingCost,
-      promoCode: promoCode || null,
-      discount: discount || 0,
+      promoCode: cleanPromoCode || null,
+      discount: calculatedDiscount,
       total,
       estimatedDelivery,
     });
 
     // ── 3. Promo code usage ─────────────────────────────────────────────────
-    if (promoCode) {
+    if (cleanPromoCode) {
       await PromoCode.findOneAndUpdate(
-        { code: promoCode.toUpperCase() },
+        { code: cleanPromoCode },
         { $inc: { usedCount: 1 } }
       );
     }

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, ShoppingBag, Package, BarChart2,
   Users, Warehouse, Truck, Settings, LogOut,
-  Menu, X, ChevronRight,
+  Menu, X, ChevronRight, Tag,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { to: "/admin/customers", icon: Users,           label: "Customers" },
   { to: "/admin/analytics", icon: BarChart2,       label: "Analytics" },
   { to: "/admin/shipping",  icon: Truck,           label: "Shipping" },
+  { to: "/admin/promos",    icon: Tag,             label: "Promo Codes" },
   { to: "/admin/settings",  icon: Settings,        label: "Settings" },
 ];
 

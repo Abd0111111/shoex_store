@@ -3,48 +3,33 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trash2, Plus, Minus, ShoppingBag,
-  ArrowRight, Tag, Heart, X,
+  ArrowRight, Tag, Heart, X, Truck,
+  ShieldCheck, Sparkles, Headset,
+  AlertCircle,
 } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { formatPrice } from "@/utils/formatCurrency";
+import api from "@/services/api";
+import { toast } from "sonner";
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
-const TAX_RATE               = 0.08;
-const FREE_SHIPPING_THRESHOLD = 100;
-const SHIPPING_COST           = 9.99;
-const MAX_QTY                 = 10;
+const MAX_QTY = 10;
 
-// TODO: move to backend — POST /api/promo/validate
-const VALID_PROMOS: Record<string, number> = {
-  SHOEX10: 0.10,
-  SHOEX20: 0.20,
-};
+interface AppliedPromo {
+  code: string;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  minOrderValue?: number;
+}
 
-// ─── Free Shipping Progress Bar ─────────────────────────────────────────────────
-function FreeShippingBar({ subtotal }: { subtotal: number }) {
-  const remaining = FREE_SHIPPING_THRESHOLD - subtotal;
-  const pct       = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
-  const qualified = subtotal >= FREE_SHIPPING_THRESHOLD;
-
+// ─── Shipping Notice (real cost is only known once governorate is picked at checkout) ──
+function ShippingNotice() {
   return (
-    <div className="mb-6 p-4 bg-[#1e1e1e] rounded-xl border border-white/5">
-      {qualified ? (
-        <p className="text-green-400 text-xs font-bold text-center mb-2">
-          🎉 You qualified for free shipping!
-        </p>
-      ) : (
-        <p className="text-gray-400 text-xs text-center mb-2">
-          Add <span className="text-white font-bold">{formatPrice(remaining)}</span> more for free shipping
-        </p>
-      )}
-      <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-        <motion.div
-          className="h-full bg-green-500 rounded-full"
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        />
-      </div>
+    <div className="mb-6 flex items-center gap-2.5 bg-[#1e1e1e] rounded-xl border border-white/5 px-4 py-3">
+      <Truck size={16} className="text-[#e63946] flex-shrink-0" />
+      <p className="text-gray-400 text-xs">
+        Shipping cost depends on your governorate — it'll be calculated at checkout.
+      </p>
     </div>
   );
 }
@@ -54,32 +39,58 @@ export default function Cart() {
   const { items, removeItem, updateQuantity, clearCart, totalPrice } = useCartStore();
 
   const [promoCode,    setPromoCode]    = useState("");
-  const [promoApplied, setPromoApplied] = useState<string | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
   const [promoError,   setPromoError]   = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // ── Totals ──
-  const subtotal     = totalPrice();
-  const shipping     = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
-  const discountRate = promoApplied ? (VALID_PROMOS[promoApplied] ?? 0) : 0;
-  const discount     = subtotal * discountRate;
-  const tax          = (subtotal - discount) * TAX_RATE;
-  const total        = subtotal - discount + shipping + tax;
+  const subtotal = totalPrice();
 
-  // ── Promo ──
-  const handleApplyPromo = () => {
-    const code = promoCode.trim().toUpperCase();
-    if (VALID_PROMOS[code]) {
-      setPromoApplied(code);
-      setPromoError("");
+  let discountAmount = 0;
+  if (appliedPromo) {
+    if (appliedPromo.discountType === "percentage") {
+      discountAmount = (subtotal * appliedPromo.discountValue) / 100;
     } else {
-      setPromoError("Invalid promo code.");
-      setPromoApplied(null);
+      discountAmount = appliedPromo.discountValue;
+    }
+    discountAmount = Math.min(discountAmount, subtotal);
+  }
+
+  const total = subtotal - discountAmount;
+
+  // ── Promo (validated against backend, same as Checkout) ──
+  const handleApplyPromo = async () => {
+    const code = promoCode.trim().toUpperCase();
+    if (!code) return;
+
+    setPromoLoading(true);
+    setPromoError("");
+    try {
+      const { data } = await api.post("/promo/validate", { code });
+      if (data.success && data.data) {
+        if (data.data.minOrderValue && subtotal < data.data.minOrderValue) {
+          setPromoError(`Minimum order value of ${formatPrice(data.data.minOrderValue)} required.`);
+          setAppliedPromo(null);
+        } else {
+          setAppliedPromo(data.data);
+          toast.success("Promo code applied successfully!");
+        }
+      } else {
+        setPromoError("Invalid promo code.");
+        setAppliedPromo(null);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.error || "Invalid promo code.";
+      setPromoError(msg);
+      setAppliedPromo(null);
+    } finally {
+      setPromoLoading(false);
     }
   };
 
   const handleRemovePromo = () => {
-    setPromoApplied(null);
+    setAppliedPromo(null);
     setPromoCode("");
     setPromoError("");
   };
@@ -314,10 +325,10 @@ export default function Cart() {
               >
                 <h2 className="text-white font-black text-xl mb-6">Order Summary</h2>
 
-                {/* Free Shipping Progress */}
-                <FreeShippingBar subtotal={subtotal} />
+                {/* Shipping notice — real cost only known at checkout */}
+                <ShippingNotice />
 
-                {/* Totals */}
+                {/* Totals — NO TAX */}
                 <div className="space-y-3 pb-4 border-b border-white/5">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Subtotal</span>
@@ -325,38 +336,41 @@ export default function Cart() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Shipping</span>
-                    <span className={shipping === 0 ? "text-green-500 font-semibold" : "text-white font-medium"}>
-                      {shipping === 0 ? "Free 🎉" : formatPrice(shipping)}
+                    <span className="text-gray-500 font-medium italic">
+                      + calculated at checkout
                     </span>
                   </div>
-                  {promoApplied && (
+                  {appliedPromo && (
                     <div className="flex justify-between text-sm">
                       <span className="text-green-400">
-                        Discount ({(discountRate * 100).toFixed(0)}%)
+                        Discount ({appliedPromo.discountType === "percentage"
+                          ? `${appliedPromo.discountValue}%`
+                          : "Fixed"})
                       </span>
-                      <span className="text-green-400 font-medium">-{formatPrice(discount)}</span>
+                      <span className="text-green-400 font-medium">-{formatPrice(discountAmount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Tax (Est.)</span>
-                    <span className="text-white font-medium">{formatPrice(tax)}</span>
-                  </div>
                 </div>
 
                 <div className="flex justify-between items-center py-4 border-b border-white/5">
                   <span className="text-white font-bold text-lg">Total</span>
-                  <span className="text-white font-black text-2xl">{formatPrice(total)}</span>
+                  <div className="text-right">
+                    <span className="text-white font-black text-2xl">{formatPrice(total)}</span>
+                    <p className="text-gray-600 text-xs">+ shipping</p>
+                  </div>
                 </div>
 
                 {/* Promo Code */}
                 <div className="mt-5 space-y-2">
-                  {promoApplied ? (
+                  {appliedPromo ? (
                     <div className="flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Tag size={14} className="text-green-400" />
-                        <span className="text-green-400 text-sm font-bold">{promoApplied}</span>
+                        <span className="text-green-400 text-sm font-bold">{appliedPromo.code}</span>
                         <span className="text-green-400 text-xs">
-                          — {(discountRate * 100).toFixed(0)}% off
+                          — {appliedPromo.discountType === "percentage"
+                            ? `${appliedPromo.discountValue}%`
+                            : formatPrice(appliedPromo.discountValue)} off
                         </span>
                       </div>
                       <button
@@ -387,12 +401,19 @@ export default function Cart() {
                       </div>
                       <button
                         onClick={handleApplyPromo}
-                        className="w-full bg-[#252525] hover:bg-[#2e2e2e] text-white font-semibold text-sm py-3 rounded-xl transition-colors"
+                        disabled={promoLoading || !promoCode.trim()}
+                        className="w-full bg-[#252525] hover:bg-[#2e2e2e] text-white font-semibold text-sm py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
                       >
-                        Apply Code
+                        {promoLoading ? (
+                          <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          "Apply Code"
+                        )}
                       </button>
                       {promoError && (
-                        <p className="text-red-500 text-xs text-center">{promoError}</p>
+                        <p className="text-red-500 text-xs text-center flex items-center justify-center gap-1.5">
+                          <AlertCircle size={12} />{promoError}
+                        </p>
                       )}
                     </>
                   )}
@@ -409,12 +430,12 @@ export default function Cart() {
                 {/* Trust hints */}
                 <div className="mt-5 space-y-2">
                   {[
-                    "Free shipping on orders over 100 EGP",
-                    "30-day return policy",
-                    "Secure checkout with SSL",
-                  ].map((text) => (
+                    { icon: Sparkles, text: "High quality, carefully selected products" },
+                    { icon: Truck, text: "Fast, reliable delivery nationwide" },
+                    { icon: Headset, text: "Excellent after-sales support" },
+                  ].map(({ icon: Icon, text }) => (
                     <div key={text} className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                      <Icon size={12} className="text-red-500 flex-shrink-0" />
                       {text}
                     </div>
                   ))}

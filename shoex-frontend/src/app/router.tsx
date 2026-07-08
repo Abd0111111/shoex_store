@@ -28,6 +28,7 @@ import AdminShipping    from "@/pages/admin/AdminShipping";
 import AdminSettings    from "@/pages/admin/AdminSettings";
 import AddProduct       from "@/pages/admin/AddProduct";
 import EditProduct      from "@/pages/admin/EditProduct"; // ← NEW
+import AdminPromos      from "@/pages/admin/AdminPromos";
 
 export const router = createBrowserRouter([
   // ── Public ──────────────────────────────────────────
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
       { path: "inventory",                    element: <AdminInventory /> },
       { path: "shipping",                     element: <AdminShipping /> },
       { path: "settings",                     element: <AdminSettings /> },
+      { path: "promos",                       element: <AdminPromos /> },
     ],
   },
 ]);

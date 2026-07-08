@@ -97,6 +97,42 @@ function UnsavedDot() {
   return <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" title="Unsaved changes" />;
 }
 
+// ── Shared field component ────────────────────────
+const Field = ({
+  id, label, error, children,
+}: { id: string; label: string; error?: string; children: React.ReactNode }) => (
+  <div>
+    <Label htmlFor={id}>{label}</Label>
+    <div className="mt-1">{children}</div>
+    {error && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error}</p>}
+  </div>
+);
+
+// ── Toggle component ──────────────────────────────
+const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
+  <div
+    onClick={() => onChange(!checked)}
+    className={`w-10 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0 ${checked ? "bg-[#dc143c]" : "bg-gray-700"}`}
+  >
+    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${checked ? "left-5" : "left-1"}`} />
+  </div>
+);
+
+// ── Save / Cancel footer ──────────────────────────
+const SaveBar = ({ onSave, onCancel, dirty }: { onSave: () => void; onCancel?: () => void; dirty: boolean }) => (
+  <div className="flex gap-3 pt-4 border-t border-white/5">
+    <Button onClick={onSave} className="bg-[#dc143c] hover:bg-[#dc143c]/90 text-white">
+      <Check className="w-4 h-4 mr-2" /> Save Changes
+    </Button>
+    {onCancel && (
+      <Button variant="outline" onClick={onCancel} className="border-white/10 text-white hover:bg-white/5">
+        Cancel
+      </Button>
+    )}
+    {dirty && <span className="text-xs text-amber-400 self-center">Unsaved changes</span>}
+  </div>
+);
+
 // ─── Nav definition ───────────────────────────────────
 const NAV_BASE = [
   { icon: Store,      label: "Store Information" },
@@ -410,6 +446,7 @@ export default function AdminSettings() {
         })),
       };
       await adminService.updateShippingSettings(payload);
+      await fetchSettings(); // reload to sync real DB ids for newly-added custom zones
       setShippingDirty(false);
       toast.success("Shipping settings saved!");
     } catch (err: any) {
@@ -625,42 +662,6 @@ export default function AdminSettings() {
       toast.error("Failed to update session timeout.");
     }
   };
-
-  // ── Shared field component ────────────────────────
-  const Field = ({
-    id, label, error, children,
-  }: { id: string; label: string; error?: string; children: React.ReactNode }) => (
-    <div>
-      <Label htmlFor={id}>{label}</Label>
-      <div className="mt-1">{children}</div>
-      {error && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error}</p>}
-    </div>
-  );
-
-  // ── Toggle component ──────────────────────────────
-  const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
-    <div
-      onClick={() => onChange(!checked)}
-      className={`w-10 h-6 rounded-full transition-colors relative cursor-pointer flex-shrink-0 ${checked ? "bg-[#dc143c]" : "bg-gray-700"}`}
-    >
-      <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${checked ? "left-5" : "left-1"}`} />
-    </div>
-  );
-
-  // ── Save / Cancel footer ──────────────────────────
-  const SaveBar = ({ onSave, onCancel, dirty }: { onSave: () => void; onCancel?: () => void; dirty: boolean }) => (
-    <div className="flex gap-3 pt-4 border-t border-white/5">
-      <Button onClick={onSave} className="bg-[#dc143c] hover:bg-[#dc143c]/90 text-white">
-        <Check className="w-4 h-4 mr-2" /> Save Changes
-      </Button>
-      {onCancel && (
-        <Button variant="outline" onClick={onCancel} className="border-white/10 text-white hover:bg-white/5">
-          Cancel
-        </Button>
-      )}
-      {dirty && <span className="text-xs text-amber-400 self-center">Unsaved changes</span>}
-    </div>
-  );
 
   if (loading) {
     return (

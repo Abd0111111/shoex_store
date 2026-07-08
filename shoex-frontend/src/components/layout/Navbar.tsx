@@ -13,7 +13,7 @@ const navLinks = [
   { label: "Products", path: "/shop" },
 ];
 
-export default function Navbar() {
+export default function Navbar({ hasBanner = false }: { hasBanner?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -107,7 +107,9 @@ export default function Navbar() {
   return (
     <>
       <motion.header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed left-0 right-0 z-50 transition-all duration-300 ${
+          hasBanner ? "top-10" : "top-0"
+        } ${
           scrolled
             ? "bg-[#0d0d0d]/95 backdrop-blur-md border-b border-[#2a2a2a]"
             : "bg-transparent"

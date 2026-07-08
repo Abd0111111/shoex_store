@@ -94,6 +94,7 @@ app.use("/api/v1/admin/shipping",      verifyToken, requireAdmin, require("./rou
 app.use("/api/v1/admin/notifications", verifyToken, requireAdmin, require("./routes/admin/notifications.routes"));
 app.use("/api/v1/admin/feedback",      verifyToken, requireAdmin, require("./routes/admin/feedback.routes"));
 app.use("/api/v1/admin/settings",      verifyToken, requireAdmin, require("./routes/admin/settings.routes"));
+app.use("/api/v1/admin/promo",         verifyToken, requireAdmin, require("./routes/admin/promo.routes"));
 app.use("/api/v1/admin/team",          verifyToken, require("./routes/admin/team.routes"));
 
 // =====================

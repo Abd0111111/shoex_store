@@ -52,4 +52,22 @@ const validatePromo = async (req, res, next) => {
   }
 };
 
-module.exports = { validatePromo };
+// GET /api/v1/promo/active
+const getActivePromo = async (req, res, next) => {
+  try {
+    const now = new Date();
+    const promo = await PromoCode.findOne({
+      isActive: true,
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gt: now } }
+      ]
+    }).sort({ createdAt: -1 });
+
+    return sendSuccess(res, promo, "Active promo retrieved successfully");
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { validatePromo, getActivePromo };
