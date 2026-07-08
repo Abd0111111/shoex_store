@@ -26,6 +26,7 @@ app.use(
       "http://localhost:4173",
       "https://shoex.com",
       "https://www.shoex.com",
+      "https://shoex-store-one.vercel.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
